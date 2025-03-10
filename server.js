@@ -88,6 +88,34 @@ app.post("/procesar-pago", async (req, res) => {
     }
 });
 
+// 🔥 Nuevo: Ruta para manejar webhooks de Stripe
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error("⚠️  Error verificando el webhook:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Manejo de eventos de Stripe
+    switch (event.type) {
+        case "checkout.session.completed":
+            console.log("✅ Pago completado:", event.data.object);
+            // Aquí puedes actualizar tu base de datos
+            break;
+        case "payment_intent.succeeded":
+            console.log("✅ Pago exitoso:", event.data.object);
+            break;
+        default:
+            console.log(`🔔 Evento recibido: ${event.type}`);
+    }
+
+    res.json({ received: true });
+});
+
 // Definir puerto
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
@@ -95,4 +123,5 @@ app.listen(PORT, () => {
     console.log("🔍 STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "Cargada" : "No cargada");
     console.log("🔍 STRIPE_PUBLIC_KEY:", process.env.STRIPE_PUBLIC_KEY ? "Cargada" : "No cargada");
     console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
+    console.log("🔍 STRIPE_WEBHOOK_SECRET:", process.env.STRIPE_WEBHOOK_SECRET ? "Cargada" : "No cargada"); // Nuevo: Verificar el webhook secret
 });

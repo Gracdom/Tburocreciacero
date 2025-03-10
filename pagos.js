@@ -46,11 +46,43 @@ async function inicializarStripeElements() {
     return null;
   }
 
-  const elements = stripe.elements();
+  const elements = stripe.elements({ locale: 'es' });
 
-  const cardNumber = elements.create('cardNumber', { placeholder: 'Número de tarjeta' });
-  const cardExpiry = elements.create('cardExpiry', { placeholder: 'MM/AA' });
-  const cardCvc = elements.create('cardCvc', { placeholder: 'CVC' });
+  const cardNumber = elements.create('cardNumber', { 
+    placeholder: 'Número de tarjeta',
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#32325d',
+        '::placeholder': {
+          color: '#aab7c4'
+        }
+      },
+      invalid: {
+        color: '#fa755a'
+      }
+    }
+  });
+  
+  const cardExpiry = elements.create('cardExpiry', { 
+    placeholder: 'MM/AA',
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#32325d'
+      }
+    }
+  });
+  
+  const cardCvc = elements.create('cardCvc', { 
+    placeholder: 'CVC',
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#32325d'
+      }
+    }
+  });
 
   cardNumber.mount('#card-number');
   cardExpiry.mount('#card-expiry');
@@ -58,11 +90,8 @@ async function inicializarStripeElements() {
 
   const displayError = document.getElementById('card-errors');
   cardNumber.on('change', (event) => {
-    if (event.error) {
-      displayError.textContent = event.error.message;
-    } else {
-      displayError.textContent = '';
-    }
+    displayError.textContent = event.error ? event.error.message : '';
+    displayError.style.color = event.error ? '#fa755a' : '';
   });
 
   return { stripe, cardNumber };
@@ -74,12 +103,32 @@ document.getElementById("formPago").addEventListener("submit", async function (e
 
   const nombreApellidos = document.getElementById("nombreApellidos").value.trim();
   const telefono = document.getElementById("telefono").value.trim();
+  const correo = document.getElementById("correo").value.trim();
 
-  if (!nombreApellidos || !telefono) {
+  // Validación de campos
+  if (!nombreApellidos || !telefono || !correo) {
     Swal.fire({
       icon: "error",
       title: "Campos incompletos",
       text: "Por favor, completa todos los campos del formulario de pago.",
+    });
+    return;
+  }
+
+  if (!/^\d{9}$/.test(telefono)) {
+    Swal.fire({
+      icon: "error",
+      title: "Teléfono inválido",
+      text: "El teléfono debe ser un número de 9 dígitos.",
+    });
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    Swal.fire({
+      icon: "error",
+      title: "Correo inválido",
+      text: "Por favor, introduce una dirección de correo válida.",
     });
     return;
   }
@@ -92,7 +141,13 @@ document.getElementById("formPago").addEventListener("submit", async function (e
       throw new Error("Stripe no se inicializó correctamente.");
     }
 
-    const { token, error } = await stripe.createToken(cardNumber);
+    // Validar datos de tarjeta
+    const { token, error } = await stripe.createToken(cardNumber, {
+      name: nombreApellidos,
+      address_line1: 'Dirección del titular',
+      address_city: 'Ciudad',
+      address_country: 'ES'
+    });
 
     if (error) {
       Swal.fire({
@@ -108,7 +163,12 @@ document.getElementById("formPago").addEventListener("submit", async function (e
     const response = await fetch("/procesar-pago", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: token.id, amount: Math.round(total * 100) }),
+      body: JSON.stringify({ 
+        token: token.id, 
+        amount: Math.round(total * 100),
+        currency: 'eur',
+        description: `Pago de trámite - ${nombreApellidos}`
+      }),
     });
 
     const result = await response.json();
@@ -118,6 +178,10 @@ document.getElementById("formPago").addEventListener("submit", async function (e
         icon: "success",
         title: "Pago exitoso",
         text: "Tu pago se ha procesado correctamente.",
+        confirmButtonText: 'Entendido',
+        allowOutsideClick: false
+      }).then(() => {
+        window.location.href = '/success'; // Redirección tras pago exitoso
       });
     } else {
       Swal.fire({
@@ -190,7 +254,11 @@ async function calcularPrecioYGuardar() {
     listarVehiculos();
   } catch (error) {
     console.error("Error al guardar en Firebase:", error.message || error);
-    alert("Hubo un error al guardar los datos. Detalles: " + (error.message || error));
+    Swal.fire({
+      icon: "error",
+      title: "Error al guardar",
+      text: "Hubo un problema al guardar los datos. Por favor, inténtalo más tarde.",
+    });
   }
 
   showTab('precio');
