@@ -1,5 +1,8 @@
 import { app, db } from "./firebase.js";
 import { collection, getDocs, addDoc } from "firebase/firestore";
+// Agrega estos imports al inicio de tu archivo JavaScript
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+
 
 const vehiculosCollection = collection(db, "Vehículo");
 
@@ -318,3 +321,116 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("modalDocumento")?.addEventListener("click", cerrarModalFuera);
   document.addEventListener("keydown", cerrarModalConEsc);
 });
+
+
+
+
+
+
+
+
+
+
+//// Agrega esto al inicio de tu archivo
+const fileInput = document.getElementById('fileInput');
+const dropArea = document.getElementById('dropArea');
+const fileList = document.getElementById('fileList');
+const progressBar = document.getElementById('progressBar');
+const progressContainer = document.getElementById('progressContainer');
+
+// Modifica la función handleFiles
+async function handleFiles(files) {
+  progressContainer.style.display = 'block';
+  
+  // Usar for...of para manejar async correctamente
+  for (const file of files) {
+    if (!file.type.match('image.(png|jpg|jpeg)')) {
+      alert('Solo se permiten archivos PNG/JPG');
+      continue;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('El archivo no puede superar 5MB');
+      continue;
+    }
+
+    await subirArchivo(file);
+  }
+}
+
+// Modifica la función subirArchivo
+async function subirArchivo(file) {
+  // Crear elemento de lista con miniatura
+  const listItem = document.createElement('li');
+  listItem.className = 'file-item';
+  
+  // Crear elemento de imagen
+  const img = document.createElement('img');
+  img.classList.add('thumbnail');
+  
+  // Leer archivo para vista previa
+  const reader = new FileReader();
+  reader.onload = function() {
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+
+  // Estructura del elemento
+  listItem.innerHTML = `
+    <div class="file-info">
+      ${file.name}
+      <div class="progress-bar-container">
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+  `;
+  listItem.prepend(img);
+  fileList.appendChild(listItem);
+  
+  const progressBarItem = listItem.querySelector('.progress-bar');
+
+  // Subir a Firebase
+  const storageRef = ref(storage, `documentos/${Date.now()}-${file.name}`);
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  return new Promise((resolve, reject) => {
+    uploadTask.on('state_changed', 
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        progressBarItem.style.width = `${progress}%`;
+        
+        if (progress === 100) {
+          setTimeout(() => {
+            progressBarItem.parentElement.style.display = 'none';
+          }, 500);
+        }
+      },
+      (error) => {
+        console.error('Error al subir:', error);
+        listItem.innerHTML += ' - Error';
+        reject(error);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        
+        // Actualizar elemento con enlace
+        listItem.innerHTML = `
+          <div class="file-info">
+            <a href="${downloadURL}" target="_blank">${file.name}</a>
+            <span class="success">✓</span>
+          </div>
+        `;
+        listItem.prepend(img); // Mantener miniatura
+        
+        // Guardar en Firestore
+        await addDoc(collection(db, "documentos"), {
+          nombre: file.name,
+          url: downloadURL,
+          fecha: new Date().toISOString()
+        });
+        
+        resolve();
+      }
+    );
+  });
+}
