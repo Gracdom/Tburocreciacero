@@ -1,31 +1,105 @@
+// Agrega SweetAlert2 desde un CDN en tu archivo HTML
+// <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 // Importar el SDK de Stripe
 import { loadStripe } from '@stripe/stripe-js';
-
-// Función para cargar la clave pública de Stripe desde el backend
-async function cargarStripePublicKey() {
-  try {
-    const response = await fetch('/config-stripe'); // Llama al endpoint del backend
-    const data = await response.json();
-    return data.publicKey; // Retorna la clave pública
-  } catch (error) {
-    console.error("Error al cargar la clave pública de Stripe:", error.message);
-    throw error;
-  }
-}
-
-// Configura Stripe con la clave pública obtenida del backend
-let stripe;
-cargarStripePublicKey().then((publicKey) => {
-  stripe = Stripe(publicKey); // Inicializa Stripe con la clave pública
-}).catch((error) => {
-  console.error("No se pudo inicializar Stripe:", error.message);
-});
 
 // Función para mostrar el resumen del trámite
 function mostrarResumen() {
   const total = parseFloat(document.getElementById("total").textContent.replace(" €", ""));
   document.getElementById("pagoTotal").textContent = total.toFixed(2);
   document.getElementById("pagoTotalBoton").textContent = total.toFixed(2);
+}
+
+// Función para cargar la clave pública de Stripe desde el backend
+async function cargarStripe() {
+  try {
+    const response = await fetch("/config-stripe");
+    if (!response.ok) {
+      throw new Error(`Error al cargar la clave pública de Stripe: ${response.status}`);
+    }
+    const { publicKey } = await response.json();
+    if (!publicKey) {
+      throw new Error("La clave pública de Stripe no está disponible.");
+    }
+    return loadStripe(publicKey);
+  } catch (error) {
+    console.error("Error al cargar Stripe:", error.message);
+    Swal.fire({
+      icon: "error",
+      title: "Error al cargar Stripe",
+      text: "Hubo un problema al cargar la pasarela de pago. Por favor, inténtalo más tarde.",
+    });
+    return null;
+  }
+}
+
+// Función para inicializar Stripe Elements
+async function inicializarStripeElements() {
+  try {
+    const stripe = await cargarStripe();
+    if (!stripe) {
+      throw new Error("No se pudo cargar Stripe.");
+    }
+
+    const elements = stripe.elements({ locale: 'es' });
+
+    const cardNumber = elements.create('cardNumber', { 
+      placeholder: 'Número de tarjeta',
+      style: {
+        base: {
+          fontSize: '16px',
+          color: '#32325d',
+          '::placeholder': {
+            color: '#aab7c4'
+          }
+        },
+        invalid: {
+          color: '#fa755a'
+        }
+      }
+    });
+
+    const cardExpiry = elements.create('cardExpiry', { 
+      placeholder: 'MM/AA',
+      style: {
+        base: {
+          fontSize: '16px',
+          color: '#32325d'
+        }
+      }
+    });
+
+    const cardCvc = elements.create('cardCvc', { 
+      placeholder: 'CVC',
+      style: {
+        base: {
+          fontSize: '16px',
+          color: '#32325d'
+        }
+      }
+    });
+
+    cardNumber.mount('#card-number');
+    cardExpiry.mount('#card-expiry');
+    cardCvc.mount('#card-cvc');
+
+    const displayError = document.getElementById('card-errors');
+    cardNumber.on('change', (event) => {
+      displayError.textContent = event.error ? event.error.message : '';
+      displayError.style.color = event.error ? '#fa755a' : '';
+    });
+
+    return { stripe, cardNumber };
+  } catch (error) {
+    console.error("Error al inicializar Stripe Elements:", error.message);
+    Swal.fire({
+      icon: "error",
+      title: "Error al inicializar Stripe",
+      text: "Hubo un problema al inicializar la pasarela de pago. Por favor, inténtalo más tarde.",
+    });
+    return null;
+  }
 }
 
 // Función para validar los campos del formulario
@@ -73,21 +147,55 @@ document.getElementById("formPago").addEventListener("submit", async function (e
   const total = parseFloat(document.getElementById("pagoTotal").textContent);
 
   try {
-    const response = await fetch("/crear-sesion-pago", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total }), // Enviar el monto al backend
+    const { stripe, cardNumber } = await inicializarStripeElements();
+    if (!stripe || !cardNumber) {
+      throw new Error("Stripe no se inicializó correctamente.");
+    }
+
+    const { token, error } = await stripe.createToken(cardNumber, {
+      name: document.getElementById("nombreApellidos").value.trim(),
+      address_line1: 'Dirección del titular',
+      address_city: 'Ciudad',
+      address_country: 'ES'
     });
 
-    const session = await response.json();
-    if (session.id) {
-      // Redirigir al usuario a la página de pago de Stripe
-      stripe.redirectToCheckout({ sessionId: session.id });
+    if (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error en la tarjeta",
+        text: error.message,
+      });
+      return;
+    }
+
+    const response = await fetch("/procesar-pago", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        token: token.id, 
+        amount: Math.round(total * 100),
+        currency: 'eur',
+        description: `Pago de trámite - ${document.getElementById("nombreApellidos").value.trim()}`
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      Swal.fire({
+        icon: "success",
+        title: "Pago exitoso",
+        text: "Tu pago se ha procesado correctamente.",
+        confirmButtonText: 'Entendido',
+        allowOutsideClick: false
+      }).then(() => {
+        window.location.href = '/success'; // Redirección tras pago exitoso
+      });
     } else {
       Swal.fire({
         icon: "error",
         title: "Error en el pago",
-        text: "No se pudo crear la sesión de pago.",
+        text: result.error || "Hubo un problema al procesar el pago.",
       });
     }
   } catch (error) {

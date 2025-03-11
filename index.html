@@ -325,15 +325,39 @@
             <li><strong>Atención 24/7</strong></li>
           </ul>
 
-          <p><strong>Tarjeta de crédito:</strong></p>
+          <button type="submit">Tramitar <span id="pagoTotalBoton">0.00</span> €</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-          <!-- Contenedores de Stripe Elements -->
-          <div id="card-number" class="stripe-element"></div>
-          <div id="card-expiry" class="stripe-element"></div>
-          <div id="card-cvc" class="stripe-element"></div>
+  <div class="pago-container">
+    <div id="pago" class="tab-content">
+      <h2>Pago</h2>
+      <form id="formPago">
+        <div class="pago-datos">
+          <label for="nombreApellidos">Nombre y Apellidos</label>
+          <input type="text" id="nombreApellidos" name="nombreApellidos" placeholder="Nombre y Apellidos" required>
 
-          <!-- Mensaje de error -->
-          <div id="card-errors" role="alert"></div>
+          <label for="telefono">Teléfono</label>
+          <input type="tel" id="telefono" name="telefono" placeholder="Teléfono" required>
+
+          <label for="correo">Correo</label>
+          <input type="email" id="correo" name="correo" placeholder="Correo" required>
+
+          <button type="button" id="verResumenBtn">
+            Ver resumen del trámite
+          </button>
+        </div>
+
+        <div class="pago-resumen">
+          <p><strong>Total a pagar: <span id="pagoTotal">0.00</span> €</strong></p>
+
+          <ul>
+            <li><strong>Garantía de devolución</strong></li>
+            <li><strong>Envío gratuito</strong></li>
+            <li><strong>Atención 24/7</strong></li>
+          </ul>
 
           <button type="submit">Tramitar <span id="pagoTotalBoton">0.00</span> €</button>
         </div>
@@ -341,90 +365,6 @@
     </div>
   </div>
 
-
-
-
-
-  <script>
-    // Configura Stripe con tu clave pública de prueba
-    const stripe = Stripe('pk_live_51OpdmhJaeP6i0xi8jRwNDGcYTYdAwSApd8oNwL3oOcnm12IaGZnAWDxVefXYW1A5xQtemIcWbHEBk9DVNnnzBjG200wsAT4SJR'); // Reemplaza con tu clave pública de prueba
-
-    // Crea una instancia de Elements
-    const elements = stripe.elements();
-
-    // Crea y monta los elementos de Stripe
-    const cardNumber = elements.create('cardNumber', {
-      placeholder: 'Número de tarjeta',
-      style: {
-        base: {
-          fontSize: '16px',
-          color: '#32325d',
-          '::placeholder': {
-            color: '#aab7c4'
-          }
-        },
-        invalid: {
-          color: '#fa755a'
-        }
-      }
-    });
-    cardNumber.mount('#card-number');
-
-    const cardExpiry = elements.create('cardExpiry', {
-      placeholder: 'MM/AA',
-      style: {
-        base: {
-          fontSize: '16px',
-          color: '#32325d'
-        }
-      }
-    });
-    cardExpiry.mount('#card-expiry');
-
-    const cardCvc = elements.create('cardCvc', {
-      placeholder: 'CVC',
-      style: {
-        base: {
-          fontSize: '16px',
-          color: '#32325d'
-        }
-      }
-    });
-    cardCvc.mount('#card-cvc');
-
-    // Maneja errores de la tarjeta
-    const displayError = document.getElementById('card-errors');
-    cardNumber.on('change', (event) => {
-      displayError.textContent = event.error ? event.error.message : '';
-    });
-
-    // Maneja el envío del formulario
-    const form = document.getElementById('formPago');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      // Crea un token de pago con Stripe
-      const { token, error } = await stripe.createToken(cardNumber, {
-        name: document.getElementById('nombreApellidos').value.trim(),
-      });
-
-      if (error) {
-        displayError.textContent = error.message;
-      } else {
-        displayError.textContent = '';
-        console.log('Token generado:', token.id);
-        // Aquí puedes enviar el token a tu servidor para procesar el pago
-        alert('Pago procesado correctamente. Token: ' + token.id);
-      }
-    });
-
-    // Actualiza el total cuando se hace clic en "Ver resumen del trámite"
-    document.getElementById('verResumenBtn').addEventListener('click', () => {
-      const total = 100.00; // Cambia esto por el cálculo real del total
-      document.getElementById('pagoTotal').textContent = total.toFixed(2);
-      document.getElementById('pagoTotalBoton').textContent = total.toFixed(2);
-    });
-  </script>
 
 
 

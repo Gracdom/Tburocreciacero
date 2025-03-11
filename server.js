@@ -10,10 +10,18 @@ app.use(cors());
 // Verificar que las variables de entorno estén definidas
 if (!process.env.STRIPE_SECRET_KEY || !process.env.FRONTEND_URL || !process.env.STRIPE_PUBLIC_KEY) {
     console.error("❌ ERROR: Faltan variables de entorno. Verifica tu archivo .env");
+    console.error("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "✅" : "❌");
+    console.error("STRIPE_PUBLIC_KEY:", process.env.STRIPE_PUBLIC_KEY ? "✅" : "❌");
+    console.error("FRONTEND_URL:", process.env.FRONTEND_URL ? "✅" : "❌");
     process.exit(1);
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // Inicializa Stripe con la clave secreta
+
+// Ruta de prueba para verificar que el servidor está corriendo
+app.get("/", (req, res) => {
+    res.send("🚀 API de pagos funcionando correctamente.");
+});
 
 // Ruta para proporcionar la clave pública de Stripe al frontend
 app.get("/config-stripe", (req, res) => {
@@ -38,14 +46,14 @@ app.post("/crear-sesion-pago", async (req, res) => {
                     price_data: {
                         currency: "eur",
                         product_data: { name: "Pago de trámite" },
-                        unit_amount: Math.round(amount * 100), // Monto en céntimos
+                        unit_amount: amount, // Monto en céntimos
                     },
                     quantity: 1,
                 },
             ],
             mode: "payment",
-            success_url: `${process.env.FRONTEND_URL}/success`,
-            cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+            success_url: `${process.env.FRONTEND_URL}/success`, // URL de éxito
+            cancel_url: `${process.env.FRONTEND_URL}/cancel`, // URL de cancelación
         });
 
         // Devolver el ID de la sesión de pago
@@ -54,13 +62,46 @@ app.post("/crear-sesion-pago", async (req, res) => {
         console.error("❌ Error al crear la sesión de pago:", error.message);
         res.status(500).json({
             error: "Error interno del servidor",
-            details: error.message,
+            details: error.message, // Enviar detalles del error al frontend
         });
     }
+});
+
+// Ruta para manejar webhooks de Stripe
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+
+    let event;
+    try {
+        // Verificar el webhook
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error("⚠️  Error verificando el webhook:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Manejo de eventos de Stripe
+    switch (event.type) {
+        case "checkout.session.completed":
+            console.log("✅ Pago completado:", event.data.object);
+            // Aquí puedes actualizar tu base de datos
+            break;
+        case "payment_intent.succeeded":
+            console.log("✅ Pago exitoso:", event.data.object);
+            break;
+        default:
+            console.log(`🔔 Evento recibido: ${event.type}`);
+    }
+
+    res.json({ received: true });
 });
 
 // Definir puerto
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log("✅ Servidor corriendo en el puerto:", PORT);
+    console.log("🔍 STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "Cargada" : "No cargada");
+    console.log("🔍 STRIPE_PUBLIC_KEY:", process.env.STRIPE_PUBLIC_KEY ? "Cargada" : "No cargada");
+    console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
+    console.log("🔍 STRIPE_WEBHOOK_SECRET:", process.env.STRIPE_WEBHOOK_SECRET ? "Cargada" : "No cargada");
 });
