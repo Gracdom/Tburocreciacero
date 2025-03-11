@@ -2083,3 +2083,149 @@ label {
     max-width: 100%; /* Ajustar el tamaño de las imágenes en móviles pequeños */
   }
 }
+
+
+
+
+/* Estilos para miniaturas y lista */
+#fileList {
+  list-style: none;
+  padding: 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  margin: 5px 0;
+}
+
+.thumbnail {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  margin-right: 10px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 5px;
+  background: #eee;
+  margin: 5px 0;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: #ff6b6b;
+  transition: width 0.3s;
+}
+
+.success {
+  color: #ff6363;
+  margin-left: 10px;
+}
+
+
+
+
+
+
+
+
+
+.pago-container {
+  font-family: Arial, sans-serif;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 20px;
+}
+
+.pago-container .tab-content {
+  max-width: 600px;
+  margin: 0 auto;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.pago-container h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: #333;
+}
+
+.pago-container .pago-datos,
+.pago-container .pago-resumen {
+  margin-bottom: 20px;
+}
+
+.pago-container label {
+  display: block;
+  margin: 10px 0 5px;
+  font-weight: bold;
+  color: #555;
+}
+
+.pago-container input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.pago-container button {
+  background: #411515;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.pago-container button:hover {
+  background: #471616;
+}
+
+.pago-container #verResumenBtn {
+  background: white;
+  color: black;
+  border: 1px solid #ccc;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.pago-container .stripe-element {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  background: white;
+}
+
+.pago-container #card-errors {
+  color: #fa755a;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.pago-container ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.pago-container ul li {
+  margin: 5px 0;
+  color: #555;
+}
