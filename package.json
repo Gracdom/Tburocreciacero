@@ -1,12 +1,8 @@
 {
   "dependencies": {
-    "@stripe/stripe-js": "^5.10.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "@stripe/stripe-js": "^6.0.0",
     "firebase": "^11.2.0",
     "fuse.js": "^7.1.0",
-    "stripe": "^17.7.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
