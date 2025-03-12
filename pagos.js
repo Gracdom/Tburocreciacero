@@ -1,5 +1,11 @@
-// Configura Stripe con tu clave pública
-const stripe = Stripe('pk_live_51OpdmhJaeP6i0xi8jRwNDGcYTYdAwSApd8oNwL3oOcnm12IaGZnAWDxVefXYW1A5xQtemIcWbHEBk9DVNnnzBjG200wsAT4SJR'); // Reemplaza con tu clave pública
+// Agrega SweetAlert2 desde un CDN en tu archivo HTML
+// <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+// Importar el SDK de Stripe
+import { loadStripe } from '@stripe/stripe-js';
+
+// Configura Stripe con tu clave pública de prueba
+const stripe = Stripe('pk_live_51OpdmhJaeP6i0xi8jRwNDGcYTYdAwSApd8oNwL3oOcnm12IaGZnAWDxVefXYW1A5xQtemIcWbHEBk9DVNnnzBjG200wsAT4SJR'); // Reemplaza con tu clave pública de prueba
 
 // Crea una instancia de Elements
 const elements = stripe.elements();
@@ -50,6 +56,13 @@ cardNumber.on('change', (event) => {
   displayError.textContent = event.error ? event.error.message : '';
 });
 
+// Función para mostrar el resumen del trámite
+function mostrarResumen() {
+  const total = parseFloat(document.getElementById("total").textContent.replace(" €", ""));
+  document.getElementById("pagoTotal").textContent = total.toFixed(2);
+  document.getElementById("pagoTotalBoton").textContent = total.toFixed(2);
+}
+
 // Función para validar los campos del formulario
 function validarCampos() {
   const nombreApellidos = document.getElementById("nombreApellidos").value.trim();
@@ -57,25 +70,37 @@ function validarCampos() {
   const correo = document.getElementById("correo").value.trim();
 
   if (!nombreApellidos || !telefono || !correo) {
-    alert("Por favor, completa todos los campos del formulario.");
+    Swal.fire({
+      icon: "error",
+      title: "Campos incompletos",
+      text: "Por favor, completa todos los campos del formulario de pago.",
+    });
     return false;
   }
 
   if (!/^\d{9}$/.test(telefono)) {
-    alert("El teléfono debe ser un número de 9 dígitos.");
+    Swal.fire({
+      icon: "error",
+      title: "Teléfono inválido",
+      text: "El teléfono debe ser un número de 9 dígitos.",
+    });
     return false;
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-    alert("Por favor, introduce una dirección de correo válida.");
+    Swal.fire({
+      icon: "error",
+      title: "Correo inválido",
+      text: "Por favor, introduce una dirección de correo válida.",
+    });
     return false;
   }
 
   return true;
 }
 
-// Maneja el envío del formulario
-document.getElementById("formPago").addEventListener("submit", async (event) => {
+// Función para manejar el envío del formulario de pago
+document.getElementById("formPago").addEventListener("submit", async function (event) {
   event.preventDefault();
 
   if (!validarCampos()) return;
@@ -88,34 +113,151 @@ document.getElementById("formPago").addEventListener("submit", async (event) => 
     });
 
     if (error) {
-      displayError.textContent = error.message;
-    } else {
-      displayError.textContent = '';
-      console.log('Token generado:', token.id);
-      alert('Pago procesado correctamente. Token: ' + token.id);
-
-      // Aquí puedes enviar el token al backend para procesar el pago
-      const response = await fetch("/procesar-pago", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: token.id,
-          amount: Math.round(total * 100),
-          currency: 'eur',
-          description: `Pago de trámite - ${document.getElementById("nombreApellidos").value.trim()}`
-        }),
+      Swal.fire({
+        icon: "error",
+        title: "Error en la tarjeta",
+        text: error.message,
       });
+      return;
+    }
 
-      const result = await response.json();
-      if (result.success) {
-        alert("Pago exitoso.");
+    const response = await fetch("/procesar-pago", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        token: token.id, 
+        amount: Math.round(total * 100),
+        currency: 'eur',
+        description: `Pago de trámite - ${document.getElementById("nombreApellidos").value.trim()}`
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      Swal.fire({
+        icon: "success",
+        title: "Pago exitoso",
+        text: "Tu pago se ha procesado correctamente.",
+        confirmButtonText: 'Entendido',
+        allowOutsideClick: false
+      }).then(() => {
         window.location.href = '/success'; // Redirección tras pago exitoso
-      } else {
-        alert("Hubo un problema al procesar el pago.");
-      }
+      });
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Error en el pago",
+        text: result.error || "Hubo un problema al procesar el pago.",
+      });
     }
   } catch (error) {
     console.error("Error al procesar el pago:", error.message);
-    alert("Hubo un problema al realizar el pago. Por favor, inténtalo más tarde.");
+    Swal.fire({
+      icon: "error",
+      title: "Error al procesar el pago",
+      text: error.message || "Hubo un problema al realizar el pago. Por favor, inténtalo más tarde.",
+    });
   }
 });
+
+// Función para actualizar el total en la sección de pago
+function actualizarTotalPago() {
+  const total = parseFloat(document.getElementById("total").textContent.replace(" €", ""));
+  document.getElementById("pagoTotal").textContent = total.toFixed(2);
+  document.getElementById("pagoTotalBoton").textContent = total.toFixed(2);
+}
+
+// Llamar a actualizarTotalPago cuando se calcule el precio
+document.getElementById("calcularPrecioBtn").addEventListener("click", function () {
+  calcularPrecioYGuardar();
+  actualizarTotalPago();
+});
+
+// Asociar el botón "Ver resumen del trámite" a la función mostrarResumen
+document.getElementById("verResumenBtn").addEventListener("click", mostrarResumen);
+
+// Función para calcular el precio y guardar en Firebase
+async function calcularPrecioYGuardar() {
+  console.log("Función calcularPrecioYGuardar llamada");
+
+  calcularPrecioSinGuardar();
+
+  const fechaMatriculacion = document.getElementById("fechaMatriculacion")?.value;
+  const comunidadAutonoma = document.getElementById("comunidadAutonomaComprador")?.value;
+  const precioContrato = parseFloat(document.getElementById("precioContrato")?.value);
+  const combustible = document.getElementById("combustible")?.value;
+  const correo = document.getElementById("correo")?.value;
+  const marca = document.getElementById("marca")?.value;
+  const modelo = document.getElementById("modelo")?.value;
+
+  const valorFiscal = parseFloat(document.getElementById("valorFiscal").textContent.replace(" €", ""));
+  const impuesto = parseFloat(document.getElementById("impuesto").textContent.replace(" €", ""));
+  const total = parseFloat(document.getElementById("total").textContent.replace(" €", ""));
+
+  const nuevoRegistro = {
+    FechaMatriculacion: fechaMatriculacion,
+    ComunidadAutonoma: comunidadAutonoma,
+    Combustible: combustible,
+    Correo: correo,
+    Marca: marca,
+    Modelo: modelo,
+    PrecioContrato: precioContrato,
+    ValorFiscal: valorFiscal,
+    ITP: impuesto,
+    Total: total,
+    FechaRegistro: new Date().toISOString(),
+  };
+
+  try {
+    await addDoc(vehiculosCollection, nuevoRegistro);
+    console.log("Datos guardados correctamente en Firebase.");
+    listarVehiculos();
+  } catch (error) {
+    console.error("Error al guardar en Firebase:", error.message || error);
+    Swal.fire({
+      icon: "error",
+      title: "Error al guardar",
+      text: "Hubo un problema al guardar los datos. Por favor, inténtalo más tarde.",
+    });
+  }
+
+  showTab('precio');
+}
+
+// Función para calcular el precio sin guardar en Firebase
+function calcularPrecioSinGuardar() {
+  const fechaMatriculacion = document.getElementById("fechaMatriculacion")?.value;
+  const comunidadAutonoma = document.getElementById("comunidadAutonomaComprador")?.value;
+  const precioContrato = parseFloat(document.getElementById("precioContrato")?.value);
+  const marca = document.getElementById("marca")?.value;
+  const modelo = document.getElementById("modelo")?.value;
+
+  if (!validarFormulario()) {
+    return;
+  }
+
+  const valorBaseHacienda = 32800;
+  const antigüedad = new Date().getFullYear() - new Date(fechaMatriculacion).getFullYear();
+  const depreciacion = coeficientesDepreciacionVehiculos.find(c => antigüedad >= c.años)?.coef || 0.10;
+  const valorFiscal = calcularValorVenal(valorBaseHacienda, fechaMatriculacion, comunidadAutonoma);
+
+  const porcentajeITP = 4;
+  const baseITP = Math.max(precioContrato, valorFiscal);
+  const impuesto = calcularITP(baseITP, porcentajeITP);
+
+  const tasasDGT = 55.70;
+  const gestion = 61.36;
+  const iva = 12.89;
+  const costoAdicional1 = 12;
+  const costoAdicional2 = 9.90;
+  const total = tasasDGT + gestion + iva + impuesto + costoAdicional1 + costoAdicional2;
+
+  document.getElementById("tasasDGT").textContent = `${tasasDGT.toFixed(2)} €`;
+  document.getElementById("gestion").textContent = `${gestion.toFixed(2)} €`;
+  document.getElementById("iva").textContent = `${iva.toFixed(2)} €`;
+  document.getElementById("impuesto").textContent = `${impuesto.toFixed(2)} €`;
+  document.getElementById("total").textContent = `${total.toFixed(2)} €`;
+
+  actualizarModal(valorBaseHacienda, depreciacion, valorFiscal, impuesto);
+}
